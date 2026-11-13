@@ -1,0 +1,432 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core primitives
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isAdmin() {
+      return isVerifiedUser() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'zaid101bhau@gmail.com'
+      );
+    }
+
+    // Validation helpers
+    function isValidUserAccount(data) {
+      return data.keys().hasAll(['uid', 'email', 'status', 'isMinor', 'parentGuardianConsent', 'sellerEligibilityStatus', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'emailVerified', 'status', 'ageGroup', 'isMinor', 'parentGuardianName', 'parentGuardianEmail', 'parentGuardianConsent', 'sellerEligibilityStatus', 'payoutUpiOrBankRef', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128
+        && data.email is string && data.email.size() <= 254
+        && data.status in ['active', 'suspended', 'deletion_requested']
+        && data.isMinor is bool
+        && data.parentGuardianConsent is bool
+        && data.sellerEligibilityStatus in ['not_applied', 'pending', 'verified', 'rejected']
+        && (!('parentGuardianName' in data) || (data.parentGuardianName is string && data.parentGuardianName.size() <= 120))
+        && (!('parentGuardianEmail' in data) || (data.parentGuardianEmail is string && data.parentGuardianEmail.size() <= 254))
+        && (!('payoutUpiOrBankRef' in data) || (data.payoutUpiOrBankRef is string && data.payoutUpiOrBankRef.size() <= 160));
+    }
+
+    function isValidStudentProfile(data) {
+      return data.keys().hasAll(['uid', 'fullName', 'username', 'classLevel', 'board', 'roles', 'onboardingCompleted', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'fullName', 'username', 'classLevel', 'schoolName', 'board', 'avatarUrl', 'bio', 'roles', 'followersCount', 'followingCount', 'uploadedNotesCount', 'totalSalesCount', 'averageRating', 'contributionPoints', 'badges', 'onboardingCompleted', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100
+        && data.username is string && data.username.size() >= 3 && data.username.size() <= 40 && data.username.matches('^[a-zA-Z0-9_]+$')
+        && data.classLevel is int && data.classLevel >= 6 && data.classLevel <= 12
+        && data.board in ['CBSE', 'ICSE', 'State Board', 'Other']
+        && (!('schoolName' in data) || (data.schoolName is string && data.schoolName.size() <= 140))
+        && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 500))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 400))
+        && data.roles is list && data.roles.size() >= 1 && data.roles.size() <= 3 && data.roles[0] is string
+        && (!('badges' in data) || (data.badges is list && data.badges.size() <= 5))
+        && data.onboardingCompleted is bool;
+    }
+
+    function isValidStudyNote(data) {
+      return data.keys().hasAll(['id', 'sellerId', 'title', 'description', 'classLevel', 'subject', 'chapterName', 'board', 'price', 'isFree', 'status', 'originalityAttested', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'sellerId', 'sellerUsername', 'sellerName', 'title', 'description', 'classLevel', 'subject', 'chapterName', 'board', 'price', 'isFree', 'coverUrl', 'pdfFileId', 'pageCount', 'fileSizeBytes', 'status', 'originalityAttested', 'averageRating', 'ratingCount', 'purchaseCount', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.sellerId is string && data.sellerId.size() > 0 && data.sellerId.size() <= 128
+        && data.title is string && data.title.size() >= 4 && data.title.size() <= 140
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 2000
+        && data.classLevel is int && data.classLevel >= 6 && data.classLevel <= 12
+        && data.subject is string && data.subject.size() >= 2 && data.subject.size() <= 80
+        && data.chapterName is string && data.chapterName.size() >= 1 && data.chapterName.size() <= 120
+        && data.board in ['CBSE', 'ICSE', 'State Board', 'Other']
+        && (data.price is int || data.price is float) && data.price >= 0
+        && data.isFree is bool
+        && data.status in ['pending', 'approved', 'rejected', 'removed']
+        && data.originalityAttested is bool;
+    }
+
+    function isValidPurchase(data) {
+      return data.keys().hasAll(['id', 'buyerId', 'noteId', 'sellerId', 'amount', 'paymentType', 'transactionId', 'receiptNumber', 'status', 'createdAt'])
+        && data.keys().hasOnly(['id', 'buyerId', 'noteId', 'noteTitle', 'sellerId', 'sellerName', 'amount', 'commissionAmount', 'sellerEarning', 'paymentType', 'transactionId', 'receiptNumber', 'status', 'createdAt'])
+        && data.buyerId is string && data.buyerId.size() <= 128
+        && data.noteId is string && data.noteId.size() <= 128
+        && data.sellerId is string && data.sellerId.size() <= 128
+        && data.paymentType in ['free', 'paid']
+        && data.status in ['completed', 'refunded'];
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'buyerId', 'sellerId', 'noteId', 'amount', 'finalPayableAmount', 'paymentMethod', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'buyerId', 'sellerId', 'noteId', 'noteTitle', 'razorpayOrderId', 'razorpayPaymentId', 'amount', 'discountAmount', 'commissionAmount', 'finalPayableAmount', 'paymentMethod', 'status', 'failureReason', 'receiptNumber', 'createdAt', 'updatedAt'])
+        && data.buyerId is string && data.buyerId.size() <= 128
+        && data.paymentMethod in ['upi', 'card', 'netbanking', 'wallet', 'paylater', 'free', 'razorpay']
+        && data.status in ['created', 'pending', 'success', 'failed', 'refunded'];
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['id', 'noteId', 'buyerId', 'rating', 'comment', 'verifiedPurchase', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'noteId', 'buyerId', 'buyerName', 'buyerUsername', 'rating', 'comment', 'verifiedPurchase', 'helpfulCount', 'helpfulVoters', 'reportedCount', 'status', 'createdAt', 'updatedAt'])
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() >= 5 && data.comment.size() <= 1200
+        && data.verifiedPurchase is bool
+        && data.status in ['active', 'hidden']
+        && (!('helpfulVoters' in data) || (data.helpfulVoters is list && data.helpfulVoters.size() <= 500));
+    }
+
+    function isValidFeedback(data) {
+      return data.keys().hasAll(['id', 'userId', 'studentName', 'category', 'rating', 'message', 'isAnonymous', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'userId', 'studentName', 'category', 'rating', 'message', 'screenshotUrl', 'isAnonymous', 'status', 'adminReply', 'repliedAt', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.userId is string && data.userId.size() <= 128
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 100
+        && data.category in ['Website Experience', 'Buying Experience', 'Selling Experience', 'Notes Quality', 'Bug Report', 'Feature Request', 'Other']
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.message is string && data.message.size() >= 5 && data.message.size() <= 2000
+        && data.isAnonymous is bool
+        && data.status in ['Pending', 'Reviewed', 'Resolved'];
+    }
+
+    function isValidWishlistItem(data) {
+      return data.keys().hasAll(['id', 'userId', 'noteId', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userId', 'noteId', 'createdAt'])
+        && data.userId == request.auth.uid
+        && isValidId(data.noteId);
+    }
+
+    function isValidFollower(data) {
+      return data.keys().hasAll(['id', 'followerId', 'followingId', 'createdAt'])
+        && data.keys().hasOnly(['id', 'followerId', 'followingId', 'followerName', 'followingName', 'createdAt'])
+        && data.followerId == request.auth.uid
+        && data.followingId != request.auth.uid
+        && isValidId(data.followingId);
+    }
+
+    function isValidNoteChatThread(data) {
+      return data.keys().hasAll(['id', 'noteId', 'noteTitle', 'buyerId', 'buyerName', 'sellerId', 'sellerName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'noteId', 'noteTitle', 'noteSubject', 'noteClassLevel', 'notePrice', 'buyerId', 'buyerName', 'buyerUsername', 'sellerId', 'sellerName', 'sellerUsername', 'lastMessageText', 'lastSenderId', 'lastMessageAt', 'buyerUnreadCount', 'sellerUnreadCount', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.noteId)
+        && isValidId(data.buyerId)
+        && isValidId(data.sellerId)
+        && data.buyerId != data.sellerId
+        && data.noteTitle is string && data.noteTitle.size() >= 1 && data.noteTitle.size() <= 140
+        && data.buyerName is string && data.buyerName.size() >= 1 && data.buyerName.size() <= 100
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 100
+        && (!('noteSubject' in data) || (data.noteSubject is string && data.noteSubject.size() <= 80))
+        && (!('noteClassLevel' in data) || (data.noteClassLevel is int && data.noteClassLevel >= 6 && data.noteClassLevel <= 12))
+        && (!('notePrice' in data) || ((data.notePrice is int || data.notePrice is float) && data.notePrice >= 0))
+        && (!('buyerUsername' in data) || (data.buyerUsername is string && data.buyerUsername.size() <= 40))
+        && (!('sellerUsername' in data) || (data.sellerUsername is string && data.sellerUsername.size() <= 40))
+        && (!('lastMessageText' in data) || (data.lastMessageText is string && data.lastMessageText.size() <= 500))
+        && (!('lastSenderId' in data) || (data.lastSenderId is string && data.lastSenderId.size() <= 128))
+        && (!('buyerUnreadCount' in data) || (data.buyerUnreadCount is int && data.buyerUnreadCount >= 0))
+        && (!('sellerUnreadCount' in data) || (data.sellerUnreadCount is int && data.sellerUnreadCount >= 0));
+    }
+
+    function isValidNoteChatMessage(data) {
+      return data.keys().hasAll(['id', 'threadId', 'noteId', 'buyerId', 'sellerId', 'senderId', 'senderName', 'senderRole', 'text', 'createdAt'])
+        && data.keys().hasOnly(['id', 'threadId', 'noteId', 'buyerId', 'sellerId', 'senderId', 'senderName', 'senderRole', 'topicTag', 'text', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.threadId)
+        && isValidId(data.noteId)
+        && isValidId(data.buyerId)
+        && isValidId(data.sellerId)
+        && isValidId(data.senderId)
+        && data.buyerId != data.sellerId
+        && data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100
+        && data.senderRole in ['buyer', 'seller']
+        && (!('topicTag' in data) || (data.topicTag is string && data.topicTag.size() <= 60))
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 1200;
+    }
+
+    // 1. Private User Accounts (PII strict owner/admin only)
+    match /users/{uid} {
+      allow get: if isValidId(uid) && (isOwner(uid) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(uid) && isVerifiedUser() && isOwner(uid)
+        && isValidUserAccount(incoming())
+        && incoming().uid == uid
+        && incoming().status == 'active'
+        && incoming().sellerEligibilityStatus == 'not_applied';
+      allow update: if isValidId(uid) && isVerifiedUser() && isValidUserAccount(incoming()) && (
+        isAdmin() || (
+          isOwner(uid)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['emailVerified', 'ageGroup', 'isMinor', 'parentGuardianName', 'parentGuardianEmail', 'parentGuardianConsent', 'payoutUpiOrBankRef', 'status', 'updatedAt']) ||
+            (incoming().diff(existing()).affectedKeys().hasOnly(['sellerEligibilityStatus', 'payoutUpiOrBankRef', 'parentGuardianName', 'parentGuardianEmail', 'updatedAt']) && incoming().sellerEligibilityStatus == 'pending')
+          )
+          && incoming().status in ['active', 'deletion_requested']
+        )
+      );
+      allow delete: if false;
+    }
+
+    // 2. Public Student Profiles (No PII)
+    match /student_profiles/{uid} {
+      allow get: if isValidId(uid);
+      allow list: if true;
+      allow create: if isValidId(uid) && isVerifiedUser() && isOwner(uid)
+        && isValidStudentProfile(incoming())
+        && incoming().uid == uid;
+      allow update: if isValidId(uid) && isVerifiedUser() && isValidStudentProfile(incoming()) && (
+        isAdmin() ||
+        (
+          isOwner(uid)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'username', 'classLevel', 'schoolName', 'board', 'avatarUrl', 'bio', 'roles', 'onboardingCompleted', 'updatedAt'])
+        ) ||
+        (
+          incoming().uid == existing().uid
+          && incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'followingCount', 'totalSalesCount', 'averageRating', 'contributionPoints', 'badges', 'updatedAt'])
+        )
+      );
+      allow delete: if false;
+    }
+
+    // 3. Study Notes
+    match /notes/{noteId} {
+      allow get: if isValidId(noteId) && (
+        existing().status == 'approved' ||
+        (isSignedIn() && (existing().sellerId == request.auth.uid || isAdmin()))
+      );
+      allow list: if existing().status == 'approved' || (isSignedIn() && (existing().sellerId == request.auth.uid || isAdmin()));
+      allow create: if isValidId(noteId) && isVerifiedUser()
+        && isValidStudyNote(incoming())
+        && incoming().sellerId == request.auth.uid
+        && (isAdmin() || incoming().status == 'pending');
+      allow update: if isValidId(noteId) && isVerifiedUser() && isValidStudyNote(incoming()) && (
+        isAdmin() ||
+        (
+          existing().sellerId == request.auth.uid
+          && incoming().sellerId == existing().sellerId
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'chapterName', 'price', 'isFree', 'updatedAt'])
+        ) ||
+        (
+          incoming().sellerId == existing().sellerId
+          && incoming().diff(existing()).affectedKeys().hasOnly(['purchaseCount', 'averageRating', 'ratingCount', 'updatedAt'])
+        )
+      );
+      allow delete: if isValidId(noteId) && isVerifiedUser() && (existing().sellerId == request.auth.uid || isAdmin());
+    }
+
+    // 4. Subjects, Categories, Platform Settings
+    match /subjects/{subjectId} {
+      allow get: if isValidId(subjectId);
+      allow list: if true;
+      allow write: if isAdmin();
+    }
+    match /categories/{categoryId} {
+      allow get: if isValidId(categoryId);
+      allow list: if true;
+      allow write: if isAdmin();
+    }
+    match /platform_settings/{docId} {
+      allow get: if isValidId(docId);
+      allow list: if true;
+      allow write: if isAdmin();
+    }
+
+    // 5. Purchases & Transactions
+    match /purchases/{purchaseId} {
+      allow get: if isValidId(purchaseId) && isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(purchaseId) && isVerifiedUser() && isValidPurchase(incoming()) && incoming().buyerId == request.auth.uid && incoming().status == 'completed';
+      allow update: if isValidId(purchaseId) && isAdmin() && isValidPurchase(incoming());
+      allow delete: if false;
+    }
+    match /transactions/{transactionId} {
+      allow get: if isValidId(transactionId) && isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(transactionId) && isVerifiedUser() && isValidTransaction(incoming()) && incoming().buyerId == request.auth.uid;
+      allow update: if isValidId(transactionId) && isVerifiedUser() && isValidTransaction(incoming()) && (
+        isAdmin() || (
+          existing().buyerId == request.auth.uid
+          && incoming().buyerId == existing().buyerId
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'razorpayPaymentId', 'paymentMethod', 'failureReason', 'receiptNumber', 'updatedAt'])
+        )
+      );
+      allow delete: if false;
+    }
+
+    // 6. Reviews
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId) && (existing().status == 'active' || isAdmin());
+      allow list: if existing().status == 'active' || isAdmin();
+      allow create: if isValidId(reviewId) && isVerifiedUser() && isValidReview(incoming()) && incoming().buyerId == request.auth.uid && incoming().status == 'active';
+      allow update: if isValidId(reviewId) && isVerifiedUser() && isValidReview(incoming()) && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['helpfulCount', 'helpfulVoters', 'reportedCount', 'updatedAt'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 7. Followers
+    match /followers/{followId} {
+      allow get: if isValidId(followId);
+      allow list: if true;
+      allow create: if isValidId(followId) && isVerifiedUser()
+        && isValidFollower(incoming())
+        && followId == (request.auth.uid + '_' + incoming().followingId)
+        && exists(/databases/$(database)/documents/student_profiles/$(incoming().followingId));
+      allow update: if false;
+      allow delete: if isValidId(followId) && isVerifiedUser() && existing().followerId == request.auth.uid;
+    }
+
+    // 8. Activities (Following Feed)
+    match /activities/{activityId} {
+      allow get: if isValidId(activityId);
+      allow list: if true;
+      allow create: if isValidId(activityId) && isVerifiedUser() && (incoming().actorId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // 9. Notifications & Settings
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(notificationId) && isVerifiedUser() && incoming().userId is string && incoming().userId.size() <= 128;
+      allow update: if isValidId(notificationId) && isVerifiedUser()
+        && existing().userId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['isRead'])
+        && incoming().isRead is bool;
+      allow delete: if false;
+    }
+    match /notification_settings/{uid} {
+      allow get: if isValidId(uid) && isOwner(uid);
+      allow list: if false;
+      allow create, update: if isValidId(uid) && isVerifiedUser() && isOwner(uid);
+      allow delete: if false;
+    }
+
+    // 10. Feedback
+    match /feedback/{feedbackId} {
+      allow get: if isValidId(feedbackId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(feedbackId) && isVerifiedUser() && isValidFeedback(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'Pending';
+      allow update: if isValidId(feedbackId) && isAdmin() && isValidFeedback(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminReply', 'repliedAt', 'updatedAt']);
+      allow delete: if isValidId(feedbackId) && isAdmin();
+    }
+
+    // 11. Wishlists
+    match /wishlists/{wishlistId} {
+      allow get: if isValidId(wishlistId) && isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(wishlistId) && isVerifiedUser()
+        && isValidWishlistItem(incoming())
+        && wishlistId == (request.auth.uid + '_' + incoming().noteId)
+        && (
+          exists(/databases/$(database)/documents/notes/$(incoming().noteId)) ||
+          incoming().noteId.matches('^cbse_c[67]_[a-z_]+$')
+        );
+      allow update: if false;
+      allow delete: if isValidId(wishlistId) && isVerifiedUser() && existing().userId == request.auth.uid;
+    }
+
+    // 12. Refunds, Payouts, Reports, Admins
+    match /refund_requests/{refundId} {
+      allow get: if isValidId(refundId) && isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(refundId) && isVerifiedUser() && incoming().buyerId == request.auth.uid && incoming().status == 'pending';
+      allow update: if isValidId(refundId) && isAdmin();
+      allow delete: if false;
+    }
+    match /seller_payouts/{payoutId} {
+      allow get: if isValidId(payoutId) && isSignedIn() && (existing().sellerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().sellerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(payoutId) && isVerifiedUser() && incoming().sellerId == request.auth.uid && incoming().status == 'pending';
+      allow update: if isValidId(payoutId) && isAdmin();
+      allow delete: if false;
+    }
+    match /reports/{reportId} {
+      allow get, list: if isAdmin();
+      allow create: if isValidId(reportId) && isVerifiedUser() && incoming().reporterId == request.auth.uid && incoming().status == 'open';
+      allow update: if isValidId(reportId) && isAdmin();
+      allow delete: if false;
+    }
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && isSignedIn() && (isOwner(uid) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isValidId(uid) && isAdmin();
+      allow delete: if false;
+    }
+
+    // 13. Buyer/Seller Note Chat Threads & Messages
+    match /note_chat_threads/{threadId} {
+      allow get: if isValidId(threadId) && isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(threadId) && isVerifiedUser()
+        && isValidNoteChatThread(incoming())
+        && incoming().buyerId == request.auth.uid
+        && threadId == (incoming().noteId + '_' + request.auth.uid)
+        && exists(/databases/$(database)/documents/notes/$(incoming().noteId));
+      allow update: if isValidId(threadId) && isVerifiedUser() && isValidNoteChatThread(incoming()) && (
+        isAdmin() || (
+          (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid)
+          && incoming().buyerId == existing().buyerId
+          && incoming().sellerId == existing().sellerId
+          && incoming().noteId == existing().noteId
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessageText', 'lastSenderId', 'lastMessageAt', 'buyerUnreadCount', 'sellerUnreadCount', 'updatedAt'])
+        )
+      );
+      allow delete: if false;
+    }
+
+    match /note_chat_messages/{messageId} {
+      allow get: if isValidId(messageId) && isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().buyerId == request.auth.uid || existing().sellerId == request.auth.uid || isAdmin());
+      allow create: if isValidId(messageId) && isVerifiedUser()
+        && isValidNoteChatMessage(incoming())
+        && incoming().senderId == request.auth.uid
+        && (
+          (incoming().senderRole == 'buyer' && incoming().buyerId == request.auth.uid) ||
+          (incoming().senderRole == 'seller' && incoming().sellerId == request.auth.uid)
+        )
+        && exists(/databases/$(database)/documents/note_chat_threads/$(incoming().threadId))
+        && get(/databases/$(database)/documents/note_chat_threads/$(incoming().threadId)).data.buyerId == incoming().buyerId
+        && get(/databases/$(database)/documents/note_chat_threads/$(incoming().threadId)).data.sellerId == incoming().sellerId;
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "NOTE XCHANGE",
+  "description": "Learn Together. Share Knowledge. Grow Together. A student-to-student educational marketplace for Class 6 to Class 12 study notes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

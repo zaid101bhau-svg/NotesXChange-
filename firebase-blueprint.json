@@ -1,0 +1,453 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Private student account record containing PII, age safeguards, and seller eligibility status.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "emailVerified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "suspended", "deletion_requested"] },
+        "ageGroup": { "type": "string", "enum": ["under_13", "13_to_17", "18_plus"] },
+        "isMinor": { "type": "boolean" },
+        "parentGuardianName": { "type": "string", "maxLength": 120 },
+        "parentGuardianEmail": { "type": "string", "maxLength": 254 },
+        "parentGuardianConsent": { "type": "boolean" },
+        "sellerEligibilityStatus": { "type": "string", "enum": ["not_applied", "pending", "verified", "rejected"] },
+        "payoutUpiOrBankRef": { "type": "string", "maxLength": 160 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "status", "isMinor", "parentGuardianConsent", "sellerEligibilityStatus", "createdAt", "updatedAt"]
+    },
+    "StudentProfile": {
+      "title": "StudentProfile",
+      "description": "Public student profile for Class 6 to Class 12 learners, buyers, sellers, and explorers.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "username": { "type": "string", "minLength": 3, "maxLength": 40, "pattern": "^[a-zA-Z0-9_]+$" },
+        "classLevel": { "type": "integer" },
+        "schoolName": { "type": "string", "maxLength": 140 },
+        "board": { "type": "string", "enum": ["CBSE", "ICSE", "State Board", "Other"] },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "bio": { "type": "string", "maxLength": 400 },
+        "roles": { "type": "array" },
+        "followersCount": { "type": "integer" },
+        "followingCount": { "type": "integer" },
+        "uploadedNotesCount": { "type": "integer" },
+        "totalSalesCount": { "type": "integer" },
+        "averageRating": { "type": "number" },
+        "contributionPoints": { "type": "integer" },
+        "badges": { "type": "array" },
+        "onboardingCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "username", "classLevel", "board", "roles", "onboardingCompleted", "createdAt", "updatedAt"]
+    },
+    "StudyNote": {
+      "title": "StudyNote",
+      "description": "Original study note published by a student seller.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "sellerUsername": { "type": "string", "maxLength": 40 },
+        "sellerName": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "minLength": 4, "maxLength": 140 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 2000 },
+        "classLevel": { "type": "integer" },
+        "subject": { "type": "string", "maxLength": 80 },
+        "chapterName": { "type": "string", "maxLength": 120 },
+        "board": { "type": "string", "enum": ["CBSE", "ICSE", "State Board", "Other"] },
+        "price": { "type": "number" },
+        "isFree": { "type": "boolean" },
+        "coverUrl": { "type": "string", "maxLength": 500 },
+        "pdfFileId": { "type": "string", "maxLength": 200 },
+        "pageCount": { "type": "integer" },
+        "fileSizeBytes": { "type": "integer" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "removed"] },
+        "originalityAttested": { "type": "boolean" },
+        "averageRating": { "type": "number" },
+        "ratingCount": { "type": "integer" },
+        "purchaseCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sellerId", "title", "description", "classLevel", "subject", "chapterName", "board", "price", "isFree", "status", "originalityAttested", "createdAt", "updatedAt"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Academic subject catalog entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "name": { "type": "string", "maxLength": 80 },
+        "slug": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 300 },
+        "sortOrder": { "type": "integer" }
+      },
+      "required": ["id", "name", "slug"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Marketplace classification category managed by administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 80 },
+        "name": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "createdAt"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Verified note acquisition unlocking full PDF access and verified reviews.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "buyerId": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "noteTitle": { "type": "string", "maxLength": 140 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "sellerName": { "type": "string", "maxLength": 100 },
+        "amount": { "type": "number" },
+        "commissionAmount": { "type": "number" },
+        "sellerEarning": { "type": "number" },
+        "paymentType": { "type": "string", "enum": ["free", "paid"] },
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "receiptNumber": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["completed", "refunded"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "buyerId", "noteId", "sellerId", "amount", "paymentType", "transactionId", "receiptNumber", "status", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Payment gateway order and transaction ledger entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "buyerId": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "noteTitle": { "type": "string", "maxLength": 140 },
+        "razorpayOrderId": { "type": "string", "maxLength": 128 },
+        "razorpayPaymentId": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "commissionAmount": { "type": "number" },
+        "finalPayableAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["upi", "card", "netbanking", "wallet", "paylater", "free", "razorpay"] },
+        "status": { "type": "string", "enum": ["created", "pending", "success", "failed", "refunded"] },
+        "failureReason": { "type": "string", "maxLength": 300 },
+        "receiptNumber": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "buyerId", "sellerId", "noteId", "amount", "finalPayableAmount", "paymentMethod", "status", "createdAt", "updatedAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Student rating and written review for a study note.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "buyerId": { "type": "string", "maxLength": 128 },
+        "buyerName": { "type": "string", "maxLength": 100 },
+        "buyerUsername": { "type": "string", "maxLength": 40 },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string", "minLength": 5, "maxLength": 1200 },
+        "verifiedPurchase": { "type": "boolean" },
+        "helpfulCount": { "type": "integer" },
+        "reportedCount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["active", "hidden"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "noteId", "buyerId", "rating", "comment", "verifiedPurchase", "status", "createdAt", "updatedAt"]
+    },
+    "Follower": {
+      "title": "Follower",
+      "description": "Directed follow relationship between two student profiles.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 260 },
+        "followerId": { "type": "string", "maxLength": 128 },
+        "followingId": { "type": "string", "maxLength": 128 },
+        "followerName": { "type": "string", "maxLength": 100 },
+        "followingName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "followerId", "followingId", "createdAt"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "Public student feed activity for newly uploaded notes or profile updates.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorUsername": { "type": "string", "maxLength": 40 },
+        "actorName": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "enum": ["note_uploaded", "free_note_uploaded", "profile_updated"] },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "noteTitle": { "type": "string", "maxLength": 140 },
+        "subject": { "type": "string", "maxLength": 80 },
+        "classLevel": { "type": "integer" },
+        "isFree": { "type": "boolean" },
+        "summary": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actorId", "type", "summary", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification delivered to a student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 50 },
+        "title": { "type": "string", "maxLength": 120 },
+        "message": { "type": "string", "maxLength": 400 },
+        "linkPath": { "type": "string", "maxLength": 200 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "title", "message", "isRead", "createdAt"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "Student feedback or suggestion submitted to platform administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "category": { "type": "string", "enum": ["Website Experience", "Buying Experience", "Selling Experience", "Notes Quality", "Bug Report", "Feature Request", "Other"] },
+        "rating": { "type": "integer" },
+        "message": { "type": "string", "minLength": 5, "maxLength": 2000 },
+        "screenshotUrl": { "type": "string", "maxLength": 500 },
+        "isAnonymous": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Pending", "Reviewed", "Resolved"] },
+        "adminReply": { "type": "string", "maxLength": 1200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "studentName", "category", "rating", "message", "isAnonymous", "status", "createdAt", "updatedAt"]
+    },
+    "WishlistItem": {
+      "title": "WishlistItem",
+      "description": "Saved study note in a student's wishlist.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 260 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "noteId", "createdAt"]
+    },
+    "RefundRequest": {
+      "title": "RefundRequest",
+      "description": "Buyer refund request subject to admin review and payment gateway processing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "purchaseId": { "type": "string", "maxLength": 128 },
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "buyerId": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "noteTitle": { "type": "string", "maxLength": 140 },
+        "amount": { "type": "number" },
+        "reason": { "type": "string", "minLength": 5, "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "processed"] },
+        "adminNote": { "type": "string", "maxLength": 500 },
+        "razorpayRefundId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "purchaseId", "transactionId", "buyerId", "sellerId", "noteId", "amount", "reason", "status", "createdAt", "updatedAt"]
+    },
+    "SellerPayout": {
+      "title": "SellerPayout",
+      "description": "Verified seller payout disbursement request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "sellerName": { "type": "string", "maxLength": 100 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "completed", "rejected"] },
+        "payoutMethod": { "type": "string", "maxLength": 60 },
+        "accountReference": { "type": "string", "maxLength": 160 },
+        "adminNote": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sellerId", "amount", "status", "payoutMethod", "createdAt", "updatedAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Content or account abuse/copyright report submitted by a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "reporterId": { "type": "string", "maxLength": 128 },
+        "targetType": { "type": "string", "enum": ["note", "review", "user"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetLabel": { "type": "string", "maxLength": 140 },
+        "reason": { "type": "string", "maxLength": 120 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["open", "investigating", "resolved", "dismissed"] },
+        "adminNote": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reporterId", "targetType", "targetId", "reason", "status", "createdAt", "updatedAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized platform administrator record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "role": { "type": "string", "enum": ["super_admin", "moderator"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "NoteChatThread": {
+      "title": "NoteChatThread",
+      "description": "Direct buyer-to-seller conversation thread scoped to a specific study note.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "noteTitle": { "type": "string", "maxLength": 140 },
+        "noteSubject": { "type": "string", "maxLength": 80 },
+        "noteClassLevel": { "type": "integer" },
+        "notePrice": { "type": "number" },
+        "buyerId": { "type": "string", "maxLength": 128 },
+        "buyerName": { "type": "string", "maxLength": 100 },
+        "buyerUsername": { "type": "string", "maxLength": 40 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "sellerName": { "type": "string", "maxLength": 100 },
+        "sellerUsername": { "type": "string", "maxLength": 40 },
+        "lastMessageText": { "type": "string", "maxLength": 500 },
+        "lastSenderId": { "type": "string", "maxLength": 128 },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "buyerUnreadCount": { "type": "integer" },
+        "sellerUnreadCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "noteId", "noteTitle", "buyerId", "buyerName", "sellerId", "sellerName", "createdAt", "updatedAt"]
+    },
+    "NoteChatMessage": {
+      "title": "NoteChatMessage",
+      "description": "Message exchanged between a buyer and seller about a study note.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "threadId": { "type": "string", "maxLength": 128 },
+        "noteId": { "type": "string", "maxLength": 128 },
+        "buyerId": { "type": "string", "maxLength": 128 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "senderId": { "type": "string", "maxLength": 128 },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "senderRole": { "type": "string", "enum": ["buyer", "seller"] },
+        "topicTag": { "type": "string", "maxLength": 60 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "threadId", "noteId", "buyerId", "sellerId", "senderId", "senderName", "senderRole", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Private student account PII, age/guardian consent, and seller eligibility."
+    },
+    "/student_profiles/{uid}": {
+      "schema": { "$ref": "#/entities/StudentProfile" },
+      "description": "Public student profile, class, board, roles, and contribution statistics."
+    },
+    "/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/StudyNote" },
+      "description": "Study note catalog entries."
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Platform subjects taxonomy."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Platform study note categories."
+    },
+    "/purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/Purchase" },
+      "description": "Completed note purchases."
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Payment gateway transactions."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Verified student reviews and ratings."
+    },
+    "/followers/{followId}": {
+      "schema": { "$ref": "#/entities/Follower" },
+      "description": "Follow relationships between students."
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "#/entities/Activity" },
+      "description": "Following feed activities."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User notifications."
+    },
+    "/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/Feedback" },
+      "description": "Student platform feedback and admin responses."
+    },
+    "/wishlists/{wishlistId}": {
+      "schema": { "$ref": "#/entities/WishlistItem" },
+      "description": "Saved wishlist items."
+    },
+    "/refund_requests/{refundId}": {
+      "schema": { "$ref": "#/entities/RefundRequest" },
+      "description": "Buyer refund requests."
+    },
+    "/seller_payouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/SellerPayout" },
+      "description": "Seller payout disbursements."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Abuse and copyright reports."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Platform administrators."
+    },
+    "/note_chat_threads/{threadId}": {
+      "schema": { "$ref": "#/entities/NoteChatThread" },
+      "description": "Buyer-seller note inquiry conversation threads."
+    },
+    "/note_chat_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/NoteChatMessage" },
+      "description": "Immutable buyer-seller chat messages."
+    }
+  }
+}
